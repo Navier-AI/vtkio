@@ -39,7 +39,7 @@ env_logger = "0.11"
 [features]
 default = ["xml", "compression"]
 async = ["tokio"]
-compression = ["lz4", "xz2", "flate2"]
+compression = ["lz4", "liblzma", "flate2"]
 parallel = ["rayon"]
 xml = ["quick-xml", "serde"]
 # binary = []
