@@ -642,26 +642,7 @@ mod topo {
                     error_str
                 ))
             })?;
-            println!(
-                "connectivity: {:?}",
-                connectivity.data[0].clone().into_string().len()
-            );
-            println!("offsets: {:?}", offsets.data[0].clone().into_string().len());
-            println!("types: {:?}", types.data[0].clone().into_string().len());
-            println!(
-                "faces: {:?}",
-                faces
-                    .as_ref()
-                    .map(|f| f.data[0].clone().into_string().len())
-                    .unwrap_or(0)
-            );
-            println!(
-                "faceoffsets: {:?}",
-                &faceoffsets
-                    .as_ref()
-                    .map(|f| f.data[0].clone().into_string().len())
-                    .unwrap_or(0)
-            );
+
             Ok(Cells {
                 connectivity,
                 offsets,
