@@ -84,6 +84,7 @@ fn para_tet_test() -> Result {
                     vertices: vec![4, 0, 1, 2, 3],
                 },
                 types: vec![CellType::Tetra],
+                faces: None,
             },
             data: Attributes {
                 point: vec![],
@@ -124,6 +125,7 @@ fn para_tets_test() -> Result {
                     vertices: vec![4, 9, 5, 7, 8, 4, 3, 2, 0, 1, 4, 11, 6, 4, 10],
                 },
                 types: vec![CellType::Tetra; 3],
+                faces: None,
             },
             data: Attributes {
                 point: vec![Attribute::Field {
@@ -195,6 +197,7 @@ fn tet_test() -> Result {
                     vertices: vec![4, 0, 1, 2, 3],
                 },
                 types: vec![CellType::Tetra],
+                faces: None,
             },
             data: Attributes::new(),
         }),
@@ -372,6 +375,7 @@ fn cube_test() -> Result {
                     vertices: vec![8, 0, 4, 5, 1, 2, 6, 7, 3],
                 },
                 types: vec![CellType::Hexahedron],
+                faces: None,
             },
             data: Attributes::new(),
         }),
@@ -713,6 +717,7 @@ fn unstructured_grid_complex_test() -> Result {
                     CellType::Line,
                     CellType::Vertex,
                 ],
+                faces: None,
             },
             data: Attributes {
                 point: vec![
@@ -846,6 +851,7 @@ fn dodecagon_test() -> Result {
                     vertices: vec![12, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11],
                 },
                 types: vec![CellType::Polygon],
+                faces: None,
             },
             data: Attributes::new(),
         }),
@@ -913,6 +919,7 @@ fn dodecagon_with_meta_test() {
                     vertices: vec![12, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11],
                 },
                 types: vec![CellType::Polygon],
+                faces: None,
             },
             data: Attributes::new(),
         }),
@@ -981,6 +988,7 @@ fn dodecagon_with_meta_line_endings_test() {
                     vertices: vec![12, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11],
                 },
                 types: vec![CellType::Polygon],
+                faces: None,
             },
             data: Attributes::new(),
         }),
@@ -1044,6 +1052,7 @@ fn binary_dodecagon_test() {
                     vertices: vec![12, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11],
                 },
                 types: vec![CellType::Polygon],
+                faces: None,
             },
             data: Attributes::new(),
         }),
@@ -1081,6 +1090,7 @@ fn triangle_vtkidtype_test() {
                     offsets: vec![0, 3],
                 },
                 types: vec![CellType::Triangle],
+                faces: None,
             },
             data: Attributes {
                 point: vec![Attribute::Field {
