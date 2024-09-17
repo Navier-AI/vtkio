@@ -608,7 +608,11 @@ impl<BO: ByteOrder + 'static> VtkParser<BO> {
                 input,
                 DataSet::inline(UnstructuredGridPiece {
                     points: p,
-                    cells: Cells { cell_verts, types },
+                    cells: Cells {
+                        cell_verts,
+                        types,
+                        faces: None,
+                    },
                     data,
                 }),
             ))
@@ -875,6 +879,7 @@ mod tests {
                     vertices: vec![4, 0, 1, 2, 3, 4, 3, 2, 1, 0],
                 },
                 types: vec![CellType::Tetra; 2],
+                faces: None,
             },
             data: Attributes::new(),
         });
@@ -946,6 +951,7 @@ mod tests {
                     vertices: vec![],
                 },
                 types: vec![],
+                faces: None,
             },
             data: Attributes::new(),
         });
@@ -963,6 +969,7 @@ mod tests {
                     vertices: vec![],
                 },
                 types: vec![],
+                faces: None,
             },
             data: Attributes::new(),
         });
@@ -980,6 +987,7 @@ mod tests {
                     vertices: vec![],
                 },
                 types: vec![],
+                faces: None,
             },
             data: Attributes::new(),
         });
