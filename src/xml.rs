@@ -600,7 +600,7 @@ mod topo {
         where
             A: MapAccess<'de>,
         {
-            let error_str = format!("Cells data arrays must contain at least three DataArrays named \"connectivity\", \"offsets\" and \"types\";");
+            let error_str = "Cells data arrays must contain at least three DataArrays named \"connectivity\", \"offsets\" and \"types\";";
 
             let mut connectivity = None;
             let mut offsets = None;
@@ -1707,8 +1707,10 @@ impl DataArray {
                 use model::IOBuffer;
                 if matches!(ei.compressor, Compressor::None) {
                     // First byte gives the bytes
-                    let bytes =
-                        BASE64_STANDARD.decode(data.into_iter().next().unwrap().into_string())?;
+                    let bytes = BASE64_STANDARD.decode(
+                        data.into_iter().next().expect(
+                            format!("Expected vtk data array: {}, no data found!", name).as_str()
+                        ).into_string())?;
                     final_data = IOBuffer::from_bytes(
                         &bytes[header_bytes..],
                         scalar_type.into(),
@@ -1753,8 +1755,10 @@ impl DataArray {
                 use model::IOBuffer;
                 if matches!(ei.compressor, Compressor::None) {
                     // First byte gives the bytes
-                    let bytes =
-                        BASE64_STANDARD.decode(data.into_iter().next().unwrap().into_string())?;
+                    let bytes = BASE64_STANDARD.decode(
+                        data.into_iter().next().expect(
+                            format!("Expected vtk data array: {}, no data found!", name).as_str()
+                        ).into_string())?;
                     final_data = IOBuffer::from_bytes(
                         &bytes[header_bytes..],
                         scalar_type.into(),
