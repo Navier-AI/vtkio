@@ -18,7 +18,8 @@ use base64::Engine as _;
 use log;
 use serde::{Deserialize, Serialize};
 
-use crate::model;
+use crate::model::FaceData;
+use crate::{model, xml};
 
 type Result<T> = std::result::Result<T, Error>;
 
@@ -599,30 +600,55 @@ mod topo {
         where
             A: MapAccess<'de>,
         {
-            let make_err = || {
-                <A::Error as serde::de::Error>::custom(
-                "Cells data arrays must contain three DataArrays named \"connectivity\", \"offsets\" and \"types\""
-            )
-            };
+            let error_str = "Cells data arrays must contain at least three DataArrays named \"connectivity\", \"offsets\" and \"types\";";
+
             let mut connectivity = None;
             let mut offsets = None;
             let mut types = None;
+            let mut faces = None;
+            let mut faceoffsets = None;
             while let Some((_, field)) = map.next_entry::<Field, DataArray>()? {
                 match field.name.as_str() {
                     "connectivity" => connectivity = Some(field),
                     "offsets" => offsets = Some(field),
                     "types" => types = Some(field),
-                    _ => return Err(make_err()),
+                    "faces" => faces = Some(field),
+                    "faceoffsets" => faceoffsets = Some(field),
+                    _ => {
+                        return Err(<A::Error as serde::de::Error>::custom(format!(
+                            "{} field '{}' is not supported by vtkio.",
+                            error_str,
+                            field.name.as_str()
+                        )));
+                    }
                 }
             }
 
-            let connectivity = connectivity.ok_or_else(make_err)?;
-            let offsets = offsets.ok_or_else(make_err)?;
-            let types = types.ok_or_else(make_err)?;
+            let connectivity = connectivity.ok_or_else(|| {
+                <A::Error as serde::de::Error>::custom(format!(
+                    "{}, conectivity field is missing!",
+                    error_str
+                ))
+            })?;
+            let offsets = offsets.ok_or_else(|| {
+                <A::Error as serde::de::Error>::custom(format!(
+                    "{}, offsets field is missing!",
+                    error_str
+                ))
+            })?;
+            let types = types.ok_or_else(|| {
+                <A::Error as serde::de::Error>::custom(format!(
+                    "{}, types field is missing!",
+                    error_str
+                ))
+            })?;
+
             Ok(Cells {
                 connectivity,
                 offsets,
                 types,
+                faces,
+                faceoffsets,
             })
         }
     }
@@ -1013,12 +1039,28 @@ pub struct Cells {
     offsets: DataArray,
     #[serde(rename = "DataArray")]
     types: DataArray,
+    #[serde(rename = "DataArray")]
+    faces: Option<DataArray>,
+    #[serde(rename = "DataArray")]
+    faceoffsets: Option<DataArray>,
 }
 
 impl Cells {
     fn from_model_cells(cells: model::Cells, ei: EncodingInfo) -> Result<Cells> {
-        let model::Cells { cell_verts, types } = cells;
+        let model::Cells {
+            cell_verts,
+            types,
+            faces,
+        } = cells;
         let (connectivity, offsets) = cell_verts.into_xml();
+        let (faces, faceoffsets) = {
+            if let Some(_faces) = faces {
+                return Err(xml::Error::UnexpectedElement(
+                    "export of polyhedron cell types not yet supported!".to_string(),
+                ));
+            }
+            (None, None)
+        };
         Ok(Cells {
             connectivity: DataArray::from_io_buffer(connectivity.into(), ei)?
                 .with_name("connectivity"),
@@ -1031,6 +1073,8 @@ impl Cells {
                 ei,
             )?
             .with_name("types"),
+            faces,
+            faceoffsets,
         })
     }
 
@@ -1072,12 +1116,41 @@ impl Cells {
             .into_io_buffer(num_vertices, appended, ei)?
             .cast_into();
         let connectivity = connectivity.ok_or(ValidationError::InvalidDataFormat)?;
+
+        let faces = if let Some(faces) = self.faces {
+            let face_offsets = self.faceoffsets.ok_or(ValidationError::InvalidDataFormat)?;
+            let face_offsets = face_offsets
+                .parse_face_offset_data(appended, ei)
+                .map(|model::FieldArray { data, .. }| data)?;
+
+            let face_offsets: Vec<i32> = face_offsets
+                .cast_into()
+                .ok_or(ValidationError::InvalidDataFormat)?;
+
+            let face_data = faces
+                .parse_face_data(appended, ei)
+                .map(|model::FieldArray { data, .. }| data)?;
+
+            let mut face_data: Vec<i32> = face_data
+                .cast_into()
+                .ok_or(ValidationError::InvalidDataFormat)?;
+            face_data.push(0);
+
+            Some(FaceData {
+                faces: face_data,
+                faceoffsets: face_offsets,
+            })
+        } else {
+            None
+        };
+
         Ok(model::Cells {
             cell_verts: model::VertexNumbers::XML {
                 connectivity,
                 offsets,
             },
             types,
+            faces,
         })
     }
 }
@@ -1607,6 +1680,102 @@ impl DataArray {
         Ok(model::FieldArray {
             name,
             data,
+            elem: num_comp,
+        })
+    }
+
+    pub fn parse_face_offset_data(
+        self,
+        _appended: Option<&AppendedData>,
+        ei: EncodingInfo,
+    ) -> std::result::Result<model::FieldArray, ValidationError> {
+        let DataArray {
+            name,
+            scalar_type,
+            format,
+            num_comp,
+            data,
+            ..
+        } = self;
+        let final_data;
+        match format {
+            DataArrayFormat::Appended => {
+                return Err(ValidationError::Unsupported);
+            }
+            DataArrayFormat::Binary => {
+                let header_bytes = ei.header_type.size();
+                use model::IOBuffer;
+                if matches!(ei.compressor, Compressor::None) {
+                    // First byte gives the bytes
+                    let bytes = BASE64_STANDARD.decode(
+                        data.into_iter().next().expect(
+                            format!("Expected vtk data array: {}, no data found!", name).as_str()
+                        ).into_string())?;
+                    final_data = IOBuffer::from_bytes(
+                        &bytes[header_bytes..],
+                        scalar_type.into(),
+                        ei.byte_order,
+                    )?;
+                } else {
+                    return Err(ValidationError::Unsupported);
+                }
+            }
+            DataArrayFormat::Ascii => {
+                return Err(ValidationError::Unsupported);
+            }
+        }
+
+        Ok(model::FieldArray {
+            name,
+            data: final_data,
+            elem: num_comp,
+        })
+    }
+
+    pub fn parse_face_data(
+        self,
+        _appended: Option<&AppendedData>,
+        ei: EncodingInfo,
+    ) -> std::result::Result<model::FieldArray, ValidationError> {
+        let DataArray {
+            name,
+            scalar_type,
+            format,
+            num_comp,
+            data,
+            ..
+        } = self;
+        let final_data;
+        match format {
+            DataArrayFormat::Appended => {
+                return Err(ValidationError::Unsupported);
+            }
+            DataArrayFormat::Binary => {
+                let header_bytes = ei.header_type.size();
+                use model::IOBuffer;
+                if matches!(ei.compressor, Compressor::None) {
+                    // First byte gives the bytes
+                    let bytes = BASE64_STANDARD.decode(
+                        data.into_iter().next().expect(
+                            format!("Expected vtk data array: {}, no data found!", name).as_str()
+                        ).into_string())?;
+                    final_data = IOBuffer::from_bytes(
+                        &bytes[header_bytes..],
+                        scalar_type.into(),
+                        ei.byte_order,
+                    )?;
+                } else {
+                    return Err(ValidationError::Unsupported);
+                }
+            }
+            DataArrayFormat::Ascii => {
+                return Err(ValidationError::Unsupported);
+            }
+        }
+
+        Ok(model::FieldArray {
+            name,
+            data: final_data,
             elem: num_comp,
         })
     }
