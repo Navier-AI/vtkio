@@ -1805,20 +1805,6 @@ impl VertexNumbers {
     }
 }
 
-#[derive(Clone, PartialEq, Debug, Default)]
-pub struct FaceData {
-    /// stored like:
-    ///
-    /// number of faces in cell, number of verts in face, vert, vert.. number of verts, vert, etc.
-    ///
-    /// For convenience a zero is added at the end, as it is common for teh final faceoffsets value
-    /// to be the length of this vector (and thus out of bounds).
-    pub faces: Vec<i32>,
-    /// says where the cell is stored in faces, if it is, for every single cell stored in this object.
-    /// if it is not a polyhedron cell, value will be negative 1
-    pub faceoffsets: Vec<i32>,
-}
-
 /// Cells with variable types.
 ///
 /// This struct corresponds to the `Cells` XML element or the CELLS and CELL_TYPES entries in the
@@ -1833,8 +1819,6 @@ pub struct Cells {
     pub cell_verts: VertexNumbers,
     /// The type of each cell represented in `cell_verts`.
     pub types: Vec<CellType>,
-
-    pub faces: Option<FaceData>,
 }
 
 impl Cells {

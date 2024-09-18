@@ -143,7 +143,6 @@ fn make_test_file(leading_zero_offset: bool) -> Vtk {
                 .into_iter()
                 .flatten()
                 .collect::<Vec<CellType>>(),
-                faces: None,
             },
             data: Attributes {
                 point: vec![],

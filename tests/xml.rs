@@ -50,7 +50,6 @@ fn make_box_vtu() -> Vtk {
                     offsets: vec![4, 8, 12, 16, 20, 24],
                 },
                 types: vec![CellType::Polygon; 6],
-                faces: None,
             },
             data: Attributes {
                 point: vec![
@@ -146,7 +145,6 @@ fn make_box_para_vtu() -> Vtk {
                     offsets: vec![4, 8, 12, 16, 20, 24],
                 },
                 types: vec![CellType::Polygon; 6],
-                faces: None,
             },
             data: Attributes {
                 point: vec![
@@ -209,7 +207,6 @@ fn make_hexahedron_vtu() -> Vtk {
                     offsets: vec![8],
                 },
                 types: vec![CellType::Hexahedron; 1],
-                faces: None,
             },
             data: Attributes {
                 point: vec![],
@@ -393,7 +390,6 @@ fn make_tet_vtu() -> Vtk {
                     offsets: vec![4],
                 },
                 types: vec![CellType::Tetra; 1],
-                faces: None,
             },
             data: Attributes {
                 point: vec![Attribute::DataArray(DataArrayBase {
