@@ -77,9 +77,9 @@ impl From<CompressionError> for Error {
 
 #[derive(Debug)]
 pub enum CompressionError {
-    #[cfg(feature = "lz4")]
+    #[cfg(feature = "compression")]
     LZ4(lz4::frame::Error),
-    #[cfg(feature = "flate2")]
+    #[cfg(feature = "compression")]
     ZLib(flate2::CompressError),
     LZMA(std::io::Error),
     None,
@@ -88,9 +88,9 @@ pub enum CompressionError {
 impl std::fmt::Display for CompressionError {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
-            #[cfg(feature = "lz4")]
+            #[cfg(feature = "compression")]
             CompressionError::LZ4(source) => write!(f, "LZ4: {}", source),
-            #[cfg(feature = "flate2")]
+            #[cfg(feature = "compression")]
             CompressionError::ZLib(source) => write!(f, "ZLib: {}", source),
             CompressionError::LZMA(source) => write!(f, "LZMA: {}", source),
             _ => write!(f, "Unknown"),
@@ -101,9 +101,9 @@ impl std::fmt::Display for CompressionError {
 impl std::error::Error for CompressionError {
     fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
         match self {
-            #[cfg(feature = "lz4")]
+            #[cfg(feature = "compression")]
             CompressionError::LZ4(source) => Some(source),
-            #[cfg(feature = "flate2")]
+            #[cfg(feature = "compression")]
             CompressionError::ZLib(source) => Some(source),
             CompressionError::LZMA(source) => Some(source),
             _ => None,
@@ -111,14 +111,14 @@ impl std::error::Error for CompressionError {
     }
 }
 
-#[cfg(feature = "lz4")]
+#[cfg(feature = "compression")]
 impl From<lz4::frame::Error> for CompressionError {
     fn from(e: lz4::frame::Error) -> CompressionError {
         CompressionError::LZ4(e)
     }
 }
 
-#[cfg(feature = "flate2")]
+#[cfg(feature = "compression")]
 impl From<flate2::CompressError> for CompressionError {
     fn from(e: flate2::CompressError) -> CompressionError {
         CompressionError::ZLib(e)
@@ -284,7 +284,7 @@ impl Version {
 }
 
 #[derive(Copy, Clone, Debug, PartialEq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "xml", derive(serde::Serialize, serde::Deserialize))]
 pub enum ByteOrder {
     BigEndian,
     LittleEndian,
@@ -599,7 +599,7 @@ impl IOBuffer {
             // Also b64_encode should be able to encode a vector of buffers so as to avoid copying everything into yet another output buffer.
             match ei.compressor {
                 Compressor::ZLib => {
-                    #[cfg(feature = "flate2")]
+                    #[cfg(feature = "compression")]
                     {
                         use flate2::{write::ZlibEncoder, Compression};
                         let mut bufs = vec![];
@@ -627,34 +627,36 @@ impl IOBuffer {
                     }
                 }
                 Compressor::LZMA => {
-                    #[cfg(feature = "liblzma")]
+                    #[cfg(feature = "compression")]
                     {
-                        let mut bufs = vec![];
-                        for i in 0..num_blocks {
-                            let cur_block_size = if i < num_blocks - 1 {
-                                block_size
-                            } else {
-                                partial_block_bytes
-                            };
-                            let mut e = liblzma::write::XzEncoder::new(Vec::new(), ei.compression_level);
-                            self.write_bytes_block(&mut e, ei.byte_order, (i*block_size)/self.scalar_size(), cur_block_size/self.scalar_size());
-                            let buf = e.finish().map_err(CompressionError::from)?;
-                            let num_compressed_bytes = buf.len();
-                            bufs.push(buf);
-                            log::trace!("[compress]: Compressed size: {:?}", num_compressed_bytes);
-                            write_size(&mut out[(3 + i)*prefix_size..(4 + i)*prefix_size], num_compressed_bytes)?;
-                        }
-                        for mut buf in bufs.into_iter() {
-                            out.append(&mut buf);
-                        }
-                        b64_encode(&out[0..start], &mut encoded);
-                        b64_encode(&out[start..], &mut encoded);
-                        log::trace!("[compress]: Encoded size: {:?}", encoded.len());
-                        return Ok(encoded);
+                        // let mut bufs = vec![];
+                        // for i in 0..num_blocks {
+                        //     let cur_block_size = if i < num_blocks - 1 {
+                        //         block_size
+                        //     } else {
+                        //         partial_block_bytes
+                        //     };
+                        //     let mut e = liblzma::write::XzEncoder::new(Vec::new(), ei.compression_level);
+                        //     self.write_bytes_block(&mut e, ei.byte_order, (i*block_size)/self.scalar_size(), cur_block_size/self.scalar_size());
+                        //     let buf = e.finish().map_err(CompressionError::from)?;
+                        //     let num_compressed_bytes = buf.len();
+                        //     bufs.push(buf);
+                        //     log::trace!("[compress]: Compressed size: {:?}", num_compressed_bytes);
+                        //     write_size(&mut out[(3 + i)*prefix_size..(4 + i)*prefix_size], num_compressed_bytes)?;
+                        // }
+                        // for mut buf in bufs.into_iter() {
+                        //     out.append(&mut buf);
+                        // }
+                        // b64_encode(&out[0..start], &mut encoded);
+                        // b64_encode(&out[start..], &mut encoded);
+                        // log::trace!("[compress]: Encoded size: {:?}", encoded.len());
+                        // return Ok(encoded);
+
+                        unimplemented!("This implementation was removed to migrate to lzma-rs")
                     }
                 }
                 Compressor::LZ4 => {
-                    #[cfg(feature = "lz4")]
+                    #[cfg(feature = "compression")]
                     {
                         // The following commented out code is a snippet for how to do this encoding
                         // using the lz4 crate, although at the time of this writing it does not

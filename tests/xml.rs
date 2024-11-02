@@ -237,7 +237,7 @@ fn hexahedron_pvtu() -> Result {
     Ok(())
 }
 
-#[cfg(feature = "liblzma")]
+#[cfg(feature = "compression")]
 #[test]
 fn hexahedron_lzma_pvtu() -> Result {
     let mut vtu = Vtk::import("./assets/hexahedron_parallel_lzma.pvtu")?;
@@ -247,7 +247,7 @@ fn hexahedron_lzma_pvtu() -> Result {
     Ok(())
 }
 
-#[cfg(feature = "flate2")]
+#[cfg(feature = "compression")]
 #[test]
 fn hexahedron_zlib() -> Result {
     let mut vtu = Vtk::import("./assets/hexahedron_zlib_para.vtu")?;
@@ -261,7 +261,7 @@ fn hexahedron_zlib() -> Result {
 }
 
 #[cfg(feature = "binary")]
-#[cfg(feature = "flate2")]
+#[cfg(feature = "compression")]
 #[test]
 fn hexahedron_zlib_binary() -> Result {
     let path = "./assets/hexahedron_zlib_binary.vtu";
@@ -279,7 +279,7 @@ fn hexahedron_zlib_binary() -> Result {
     Ok(())
 }
 
-#[cfg(feature = "flate2")]
+#[cfg(feature = "compression")]
 #[test]
 fn hexahedron_zlib_inline_binary() -> Result {
     init();
@@ -298,7 +298,7 @@ fn hexahedron_zlib_inline_binary() -> Result {
     Ok(())
 }
 
-#[cfg(feature = "lz4")]
+#[cfg(feature = "compression")]
 #[test]
 fn hexahedron_lz4() -> Result {
     init();
@@ -317,7 +317,7 @@ fn hexahedron_lz4() -> Result {
     Ok(())
 }
 
-#[cfg(feature = "liblzma")]
+#[cfg(feature = "compression")]
 #[test]
 fn hexahedron_lzma_inline_binary() -> Result {
     init();

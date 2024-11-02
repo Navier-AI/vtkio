@@ -10,7 +10,7 @@ pub mod se;
 
 use quick_xml::de;
 use std::convert::{TryFrom, TryInto};
-use std::io::BufRead;
+use std::io::{BufRead, BufReader};
 use std::path::Path;
 
 use base64::engine::general_purpose::STANDARD as BASE64_STANDARD;
@@ -2032,7 +2032,7 @@ trait DecoderKit<'a> {
     fn make(input: &'a [u8]) -> Self;
 }
 
-#[cfg(feature = "flate2")]
+#[cfg(feature = "compression")]
 impl<'a> DecoderKit<'a> for flate2::bufread::ZlibDecoder<&'a [u8]> {
     fn read(&mut self, out: &mut [u8]) -> std::result::Result<usize, ValidationError> {
         Ok(std::io::Read::read(self, out)?)
@@ -2042,20 +2042,26 @@ impl<'a> DecoderKit<'a> for flate2::bufread::ZlibDecoder<&'a [u8]> {
     }
 }
 
-#[cfg(feature = "liblzma")]
-impl<'a> DecoderKit<'a> for liblzma::read::XzDecoder<&'a [u8]> {
-    fn read(&mut self, out: &mut [u8]) -> std::result::Result<usize, ValidationError> {
-        Ok(std::io::Read::read(self, out)?)
+#[cfg(feature = "compression")]
+struct XzDecoder<'a>(BufReader<&'a [u8]>);
+
+#[cfg(feature = "compression")]
+impl<'a> DecoderKit<'a> for XzDecoder<'a> {
+    fn read(&mut self, mut out: &mut [u8]) -> std::result::Result<usize, ValidationError> {
+        lzma_rs::xz_decompress(&mut self.0, &mut out)
+            .map_err(|err| std::io::Error::new(std::io::ErrorKind::Other, err))?;
+
+        Ok(out.len())
     }
     fn make(input: &'a [u8]) -> Self {
-        liblzma::read::XzDecoder::new(input)
+        XzDecoder(BufReader::new(input))
     }
 }
 
-#[cfg(feature = "lz4")]
+#[cfg(feature = "compression")]
 struct Lz4Decoder<'a>(&'a [u8]);
 
-#[cfg(feature = "lz4")]
+#[cfg(feature = "compression")]
 impl<'a> DecoderKit<'a> for Lz4Decoder<'a> {
     fn read(&mut self, out: &mut [u8]) -> std::result::Result<usize, ValidationError> {
         Ok(lz4::block::decompress_into(self.0, out)?)
@@ -2201,11 +2207,11 @@ where
     // Now that the data is decoded, what is left is to decompress it.
     match ei.compressor {
         Compressor::ZLib => {
-            #[cfg(not(feature = "flate2"))]
+            #[cfg(not(feature = "compression"))]
             {
                 return Err(ValidationError::MissingCompressionLibrary(ei.compressor));
             }
-            #[cfg(feature = "flate2")]
+            #[cfg(feature = "compression")]
             {
                 decompress::<flate2::bufread::ZlibDecoder<&'a [u8]>>(
                     [num_blocks, nu, np],
@@ -2215,11 +2221,11 @@ where
             }
         }
         Compressor::LZ4 => {
-            #[cfg(not(feature = "lz4"))]
+            #[cfg(not(feature = "compression"))]
             {
                 return Err(ValidationError::MissingCompressionLibrary(ei.compressor));
             }
-            #[cfg(feature = "lz4")]
+            #[cfg(feature = "compression")]
             {
                 decompress::<Lz4Decoder>(
                     [num_blocks, nu, np],
@@ -2229,13 +2235,13 @@ where
             }
         }
         Compressor::LZMA => {
-            #[cfg(not(feature = "liblzma"))]
+            #[cfg(not(feature = "compression"))]
             {
                 return Err(ValidationError::MissingCompressionLibrary(ei.compressor));
             }
-            #[cfg(feature = "liblzma")]
+            #[cfg(feature = "compression")]
             {
-                decompress::<liblzma::read::XzDecoder<&'a [u8]>>(
+                decompress::<XzDecoder>(
                     [num_blocks, nu, np],
                     &compressed_block_offsets,
                     decoded_data,
@@ -2532,13 +2538,13 @@ pub enum ValidationError {
     },
     Base64Decode(base64::DecodeError),
     Deserialize(de::DeError),
-    #[cfg(feature = "lz4")]
+    #[cfg(feature = "compression")]
     LZ4DecompressError(lz4::block::DecompressError),
     DecompressError,
     Unsupported,
 }
 
-#[cfg(feature = "lz4")]
+#[cfg(feature = "compression")]
 impl From<lz4::block::DecompressError> for ValidationError {
     fn from(e: lz4::block::DecompressError) -> ValidationError {
         ValidationError::LZ4DecompressError(e)
@@ -2590,7 +2596,7 @@ impl std::error::Error for ValidationError {
             ValidationError::Deserialize(source) => Some(source),
             ValidationError::ParseFloat(source) => Some(source),
             ValidationError::ParseInt(source) => Some(source),
-            #[cfg(feature = "lz4")]
+            #[cfg(feature = "compression")]
             ValidationError::LZ4DecompressError(source) => Some(source),
             _ => None,
         }
@@ -2642,7 +2648,7 @@ impl std::fmt::Display for ValidationError {
             ValidationError::Deserialize(source) => {
                 write!(f, "Failed to deserialize data: {:?}", source)
             }
-            #[cfg(feature = "lz4")]
+            #[cfg(feature = "compression")]
             ValidationError::LZ4DecompressError(source) => {
                 write!(f, "LZ4 decompression error: {}", source)
             }
@@ -3500,7 +3506,7 @@ mod tests {
     // Verify that image data struct works
     #[test]
     fn empty_image_data() {
-        let image_data_str = r#" 
+        let image_data_str = r#"
         <ImageData WholeExtent="0 1 0 1 0 1" Origin="0 0 0" Spacing="0.1 0.1 0.1">
             <Piece Extent="0 1 0 1 0 1">
                 <PointData Scalars="Temperature" Vectors="Velocity"/>
@@ -3520,7 +3526,7 @@ mod tests {
     // Verify that xmls with default empty meshes files work
     #[test]
     fn empty_image_data_file() {
-        let vtk_str = r#" 
+        let vtk_str = r#"
         <VTKFile type="ImageData" version="4.2" byte_order="BigEndian">
             <ImageData WholeExtent="0 1 0 1 0 1" Origin="0 0 0" Spacing="0.1 0.1 0.1">
                 <Piece Extent="0 1 0 1 0 1">
@@ -3541,7 +3547,7 @@ mod tests {
 
     #[test]
     fn image_data() {
-        let vtk_str = r#" 
+        let vtk_str = r#"
         <VTKFile type="ImageData" version="4.2" byte_order="BigEndian">
         <ImageData WholeExtent="0 1 0 1 0 1" Origin="0 0 0" Spacing="0.1 0.1 0.1">
         <Piece Extent="0 1 0 1 0 1">
